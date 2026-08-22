@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ghar Ghar Reporter — Complaint Register</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#142433;
+    --slate:#5B6570;
+    --paper:#F3F4F1;
+    --card:#FFFFFF;
+    --line:#D8DAD3;
+    --amber:#B7791F;
+    --amber-bg:#FBF0DA;
+    --teal:#2F6E68;
+    --teal-bg:#E4EFEC;
+    --rust:#B4472F;
+    --rust-bg:#F7E7E2;
+    --gray-bg:#EBEBE7;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'IBM Plex Sans',sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .topbar{
+    background:var(--ink);
+    color:var(--paper);
+    padding:22px 32px 20px;
+    border-bottom:3px solid var(--amber);
+  }
+  .topbar h1{
+    font-family:'Newsreader',serif;
+    font-weight:500;
+    font-size:26px;
+    margin:0 0 2px;
+    letter-spacing:0.2px;
+  }
+  .topbar .sub{
+    font-size:13px;
+    color:#B9C2CA;
+    font-family:'IBM Plex Mono',monospace;
+  }
+  .stat-strip{
+    display:flex;
+    gap:0;
+    background:var(--card);
+    border-bottom:1px solid var(--line);
+  }
+  .stat{
+    flex:1;
+    padding:14px 20px;
+    border-right:1px solid var(--line);
+  }
+  .stat:last-child{border-right:none;}
+  .stat .num{
+    font-family:'Newsreader',serif;
+    font-size:28px;
+    font-weight:500;
+    line-height:1;
+  }
+  .stat .lbl{
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:0.6px;
+    color:var(--slate);
+    margin-top:4px;
+  }
+  .layout{
+    display:flex;
+    max-width:1180px;
+    margin:0 auto;
+  }
+  .filters{
+    width:220px;
+    padding:24px 18px;
+    flex-shrink:0;
+  }
+  .filters h3{
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:0.6px;
+    color:var(--slate);
+    margin:0 0 10px;
+    font-weight:600;
+  }
+  .filter-group{margin-bottom:22px;}
+  .chip{
+    display:block;
+    width:100%;
+    text-align:left;
+    background:none;
+    border:none;
+    font-family:inherit;
+    font-size:13px;
+    color:var(--ink);
+    padding:5px 8px;
+    border-radius:4px;
+    cursor:pointer;
+    margin-bottom:2px;
+  }
+  .chip:hover{background:var(--gray-bg);}
+  .chip.active{background:var(--ink);color:var(--paper);}
+  .chip .count{float:right;color:var(--slate);font-family:'IBM Plex Mono',monospace;font-size:11px;}
+  .chip.active .count{color:#B9C2CA;}
+
+  .main{
+    flex:1;
+    padding:24px 24px 60px 0;
+    min-width:0;
+  }
+  .thread{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:6px;
+    margin-bottom:12px;
+    overflow:hidden;
+  }
+  .thread-head{
+    display:flex;
+    align-items:flex-start;
+    gap:16px;
+    padding:16px 18px;
+    cursor:pointer;
+  }
+  .stamp{
+    flex-shrink:0;
+    width:52px;
+    height:52px;
+    border:1.5px dashed var(--slate);
+    border-radius:50%;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    flex-direction:column;
+    transform:rotate(-4deg);
+    color:var(--slate);
+  }
+  .stamp .n{font-family:'Newsreader',serif;font-size:18px;font-weight:600;line-height:1;}
+  .stamp .t{font-size:8px;text-transform:uppercase;letter-spacing:0.4px;}
+  .thread-body{flex:1;min-width:0;}
+  .thread-title{
+    font-family:'Newsreader',serif;
+    font-size:17px;
+    font-weight:500;
+    margin:0 0 3px;
+  }
+  .thread-meta{
+    font-size:12px;
+    color:var(--slate);
+    font-family:'IBM Plex Mono',monospace;
+  }
+  .thread-meta span{margin-right:14px;}
+  .thread-right{
+    text-align:right;
+    flex-shrink:0;
+  }
+  .pill{
+    display:inline-block;
+    font-size:11px;
+    font-weight:500;
+    padding:3px 10px;
+    border-radius:100px;
+    text-transform:uppercase;
+    letter-spacing:0.4px;
+  }
+  .pill.new{background:var(--gray-bg);color:var(--slate);}
+  .pill.drafted{background:var(--gray-bg);color:var(--slate);}
+  .pill.awaiting_confirm{background:var(--amber-bg);color:var(--amber);}
+  .pill.submitted, .pill.sent{background:var(--teal-bg);color:var(--teal);}
+  .pill.in_progress{background:var(--teal-bg);color:var(--teal);}
+  .pill.resolved{background:var(--teal-bg);color:var(--teal);}
+  .pill.stale{background:var(--rust-bg);color:var(--rust);}
+  .pill.failed{background:var(--rust-bg);color:var(--rust);}
+  .channel-note{
+    font-size:11px;
+    color:var(--slate);
+    margin-top:6px;
+  }
+  .thread-detail{
+    display:none;
+    border-top:1px solid var(--line);
+    padding:16px 18px 18px;
+    background:var(--paper);
+  }
+  .thread-detail.open{display:block;}
+  .detail-row{display:flex;gap:28px;margin-bottom:14px;flex-wrap:wrap;}
+  .detail-field .k{font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:var(--slate);margin-bottom:2px;}
+  .detail-field .v{font-size:13px;font-family:'IBM Plex Mono',monospace;}
+  .draft-box{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:4px;
+    padding:12px 14px;
+    font-size:13px;
+    white-space:pre-wrap;
+    line-height:1.6;
+    color:var(--ink);
+  }
+  .confirm-btn{
+    margin-top:12px;
+    background:var(--amber);
+    color:#fff;
+    border:none;
+    padding:8px 16px;
+    border-radius:4px;
+    font-family:inherit;
+    font-size:13px;
+    font-weight:500;
+    cursor:pointer;
+  }
+  .confirm-btn:hover{opacity:0.9;}
+  .empty{
+    text-align:center;
+    padding:60px 20px;
+    color:var(--slate);
+  }
+  .empty .Big{font-family:'Newsreader',serif;font-style:italic;font-size:16px;}
+
+  @media (max-width: 720px){
+    .layout{flex-direction:column;}
+    .filters{width:auto;display:flex;flex-wrap:wrap;gap:20px;padding:16px;}
+    .main{padding:16px;}
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <h1>Ghar Ghar Reporter — Complaint Register</h1>
+  <div class="sub">Consolidated civic issue threads · Delhi NCR</div>
+</div>
+
+<div class="stat-strip" id="statStrip"></div>
+
+<div class="layout">
+  <div class="filters">
+    <div class="filter-group">
+      <h3>Status</h3>
+      <div id="statusFilters"></div>
+    </div>
+    <div class="filter-group">
+      <h3>Authority</h3>
+      <div id="authorityFilters"></div>
+    </div>
+    <div class="filter-group">
+      <h3>Ward</h3>
+      <div id="wardFilters"></div>
+    </div>
+  </div>
+
+  <div class="main" id="main"></div>
+</div>
+
+<script>
+// Mock data — shape matches IssueThread + Complaint from the routing engine.
+// Swap this for a real fetch() against your backend once it's serving data.
+let THREADS = [];
+
+async function loadThreads(){
+  try {
+    const res = await fetch('/threads');
+    const rows = await res.json();
+    THREADS = rows.map(r => ({
+      id: r.id,
+      category: r.category,
+      ward: r.ward_id,
+      authority: r.authority || "—",
+      reporterCount: r.reporter_count,
+      status: r.status,
+      channel: r.channel || "—",
+      lastUpdated: r.last_reported_at ? new Date(r.last_reported_at).toISOString().slice(0, 10) : "—",
+      refId: r.authority_reference_id || "pending",
+      autoFollowupCount: r.auto_followup_count || 0,
+      needsManualEscalation: r.needs_manual_escalation || false,
+      draft: r.draft_text || "No complaint drafted yet.",
+      callScript: "",
+      draftPost: "",
+    }));
+  } catch (err) {
+    document.getElementById("main").innerHTML = `<div class="empty"><div class="Big">Could not load threads — ${err.message}</div></div>`;
+    return;
+  }
+  render();
+}
+
+const STATUS_LABELS = {
+  new: "New", drafted: "Drafted", awaiting_confirm: "Needs your confirm",
+  sent: "Sent", submitted: "Sent", in_progress: "In progress",
+  resolved: "Resolved", stale: "Stale", failed: "Failed to send"
+};
+
+let activeStatus = "all", activeAuthority = "all", activeWard = "all", openThread = null;
+
+function uniqueCounts(field){
+  const counts = {};
+  THREADS.forEach(t => { counts[t[field]] = (counts[t[field]]||0)+1; });
+  return counts;
+}
+
+function renderStats(){
+  const buckets = { open: 0, needsConfirm: 0, resolved: 0, stale: 0 };
+  THREADS.forEach(t=>{
+    if(t.status==="resolved") buckets.resolved++;
+    else if(t.status==="stale") buckets.stale++;
+    else if(t.status==="awaiting_confirm") buckets.needsConfirm++;
+    else buckets.open++;
+  });
+  const totalReporters = THREADS.reduce((s,t)=>s+t.reporterCount,0);
+  document.getElementById("statStrip").innerHTML = `
+    <div class="stat"><div class="num">${THREADS.length}</div><div class="lbl">Issue threads</div></div>
+    <div class="stat"><div class="num">${totalReporters}</div><div class="lbl">Reports consolidated</div></div>
+    <div class="stat"><div class="num">${buckets.needsConfirm}</div><div class="lbl">Awaiting your confirm</div></div>
+    <div class="stat"><div class="num">${buckets.resolved}</div><div class="lbl">Resolved</div></div>
+    <div class="stat"><div class="num">${buckets.stale}</div><div class="lbl">Stale</div></div>
+  `;
+}
+
+function renderFilterGroup(containerId, field, activeVal, setter){
+  const counts = uniqueCounts(field);
+  const el = document.getElementById(containerId);
+  let html = `<button class="chip ${activeVal==='all'?'active':''}" onclick="${setter}('all')">All<span class="count">${THREADS.length}</span></button>`;
+  Object.keys(counts).sort().forEach(key=>{
+    const label = field === "status" ? (STATUS_LABELS[key]||key) : key;
+    html += `<button class="chip ${activeVal===key?'active':''}" onclick="${setter}('${key}')">${label}<span class="count">${counts[key]}</span></button>`;
+  });
+  el.innerHTML = html;
+}
+
+function setStatus(v){ activeStatus=v; render(); }
+function setAuthority(v){ activeAuthority=v; render(); }
+function setWard(v){ activeWard=v; render(); }
+function toggleThread(id){ openThread = openThread===id ? null : id; render(); }
+function confirmSend(id){
+  const t = THREADS.find(x=>x.id===id);
+  if(t){ t.status = "sent"; t.refId = "confirmed by ops"; render(); }
+}
+
+function render(){
+  renderStats();
+  renderFilterGroup("statusFilters", "status", activeStatus, "setStatus");
+  renderFilterGroup("authorityFilters", "authority", activeAuthority, "setAuthority");
+  renderFilterGroup("wardFilters", "ward", activeWard, "setWard");
+
+  const filtered = THREADS.filter(t =>
+    (activeStatus==="all"||t.status===activeStatus) &&
+    (activeAuthority==="all"||t.authority===activeAuthority) &&
+    (activeWard==="all"||t.ward===activeWard)
+  );
+
+  const main = document.getElementById("main");
+  if(filtered.length===0){
+    main.innerHTML = `<div class="empty"><div class="Big">No threads match these filters.</div><div style="font-size:12px;margin-top:6px;">Try clearing a filter on the left.</div></div>`;
+    return;
+  }
+
+  main.innerHTML = filtered.map(t => `
+    <div class="thread">
+      <div class="thread-head" onclick="toggleThread('${t.id}')">
+        <div class="stamp"><div class="n">${t.reporterCount}</div><div class="t">${t.reporterCount===1?'report':'reports'}</div></div>
+        <div class="thread-body">
+          <div class="thread-title">${t.category} — ${t.ward}</div>
+          <div class="thread-meta"><span>${t.authority}</span><span>${t.channel}</span><span>updated ${t.lastUpdated}</span></div>
+        </div>
+        <div class="thread-right">
+          <span class="pill ${t.status}">${STATUS_LABELS[t.status]||t.status}</span>
+          ${t.needsManualEscalation ? '<span class="pill failed" style="margin-left:4px;">Needs escalation</span>' : ''}
+          <div class="channel-note">${t.refId}${t.autoFollowupCount ? ` · ${t.autoFollowupCount} follow-up${t.autoFollowupCount>1?'s':''} sent` : ''}</div>
+        </div>
+      </div>
+      <div class="thread-detail ${openThread===t.id?'open':''}">
+        <div class="detail-row">
+          <div class="detail-field"><div class="k">Thread ID</div><div class="v">${t.id}</div></div>
+          <div class="detail-field"><div class="k">Authority reference</div><div class="v">${t.refId}</div></div>
+          <div class="detail-field"><div class="k">Channel</div><div class="v">${t.channel}</div></div>
+        </div>
+        <div class="detail-field" style="margin-bottom:8px;"><div class="k">Draft sent to authority</div></div>
+        <div class="draft-box">${t.draft}</div>
+        ${t.needsManualEscalation ? `
+        <div class="detail-field" style="margin:14px 0 8px;"><div class="k">Call script</div></div>
+        <div class="draft-box">${t.callScript}</div>
+        <div class="detail-field" style="margin:14px 0 8px;"><div class="k">Draft public post — review before publishing</div></div>
+        <div class="draft-box">${t.draftPost}</div>
+        ` : ''}
+        ${t.status==='awaiting_confirm' ? `<button class="confirm-btn" onclick="confirmSend('${t.id}')">Confirm &amp; send</button>` : ''}
+      </div>
+    </div>
+  `).join("");
+}
+
+loadThreads();
+</script>
+</body>
+</html>

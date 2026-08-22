@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Report a civic issue — Ghar Ghar Reporter</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#142433; --slate:#5B6570; --paper:#F3F4F1; --card:#FFFFFF;
+    --line:#D8DAD3; --amber:#B7791F; --amber-bg:#FBF0DA;
+    --teal:#2F6E68; --teal-bg:#E4EFEC; --rust:#B4472F; --rust-bg:#F7E7E2;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:'IBM Plex Sans',sans-serif;-webkit-font-smoothing:antialiased;}
+  .topbar{background:var(--ink);color:var(--paper);padding:22px 24px 20px;border-bottom:3px solid var(--amber);}
+  .topbar h1{font-family:'Newsreader',serif;font-weight:500;font-size:24px;margin:0 0 2px;}
+  .topbar .sub{font-size:13px;color:#B9C2CA;font-family:'IBM Plex Mono',monospace;}
+  .wrap{max-width:560px;margin:0 auto;padding:28px 20px 60px;}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:24px;margin-bottom:16px;}
+  label{display:block;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:var(--slate);margin-bottom:6px;font-weight:600;}
+  .field{margin-bottom:20px;}
+  select, textarea, input[type=text]{
+    width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:5px;
+    font-family:inherit;font-size:14px;color:var(--ink);background:var(--paper);
+  }
+  textarea{resize:vertical;min-height:80px;}
+  .upload-zone{
+    border:1.5px dashed var(--line);border-radius:6px;padding:28px 20px;text-align:center;
+    cursor:pointer;background:var(--paper);
+  }
+  .upload-zone.has-file{border-color:var(--teal);background:var(--teal-bg);}
+  .upload-zone .hint{font-size:12px;color:var(--slate);margin-top:4px;}
+  .upload-zone .filename{font-family:'IBM Plex Mono',monospace;font-size:13px;color:var(--teal);margin-top:6px;}
+  #resetMediaBtn{
+    display:block;margin:10px auto 0;background:none;border:none;color:var(--slate);
+    font-family:'IBM Plex Sans',sans-serif;font-size:12px;text-decoration:underline;cursor:pointer;padding:2px;
+  }
+  #resetMediaBtn:hover{color:var(--rust);}
+  input[type=file]{display:none;}
+  .loc-status{
+    display:flex;align-items:center;gap:8px;font-size:13px;padding:10px 12px;
+    border-radius:5px;background:var(--paper);border:1px solid var(--line);
+  }
+  .loc-dot{width:8px;height:8px;border-radius:50%;background:var(--slate);flex-shrink:0;}
+  .loc-dot.found{background:var(--teal);}
+  .loc-dot.error{background:var(--rust);}
+  .loc-mono{font-family:'IBM Plex Mono',monospace;color:var(--slate);}
+  button[type=submit]{
+    width:100%;background:var(--amber);color:#fff;border:none;padding:13px;border-radius:6px;
+    font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;
+  }
+  button[type=submit]:disabled{background:var(--line);color:var(--slate);cursor:not-allowed;}
+  button[type=submit]:not(:disabled):hover{opacity:0.92;}
+  .disclaimer{font-size:12px;color:var(--slate);margin-top:10px;line-height:1.5;}
+  .success{display:none;}
+  .success.show{display:block;}
+  .success .stamp{
+    width:64px;height:64px;border:2px dashed var(--teal);border-radius:50%;
+    display:flex;align-items:center;justify-content:center;margin:0 auto 16px;
+    transform:rotate(-3deg);color:var(--teal);font-family:'Newsreader',serif;font-size:26px;font-weight:600;
+  }
+  .success h2{font-family:'Newsreader',serif;font-weight:500;font-size:20px;text-align:center;margin:0 0 6px;}
+  .success p{text-align:center;font-size:13px;color:var(--slate);margin:0 0 16px;}
+  .receipt{background:var(--paper);border:1px solid var(--line);border-radius:5px;padding:14px;font-family:'IBM Plex Mono',monospace;font-size:12px;line-height:1.7;}
+  .receipt .k{color:var(--slate);}
+  .form-wrap.hidden{display:none;}
+  .note{
+    background:var(--amber-bg);border:1px solid #E8D2A6;border-radius:6px;padding:12px 14px;
+    font-size:12px;color:#8a5f16;margin-bottom:16px;line-height:1.5;
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <h1>Report a civic issue</h1>
+  <div class="sub">Ghar Ghar Reporter · Delhi NCR</div>
+</div>
+
+<div class="wrap">
+  <div class="note">
+    Prototype only — this page demonstrates the upload flow and the data it would send.
+    No video is actually stored yet; wire the "handleSubmit" function to your real upload endpoint (S3 presigned URL) to go live.
+  </div>
+
+  <div class="card form-wrap" id="formWrap">
+    <form id="reportForm">
+      <div class="field">
+        <label for="mediaInput">Video or photo of the issue</label>
+        <div class="upload-zone" id="uploadZone" onclick="document.getElementById('mediaInput').click()">
+          <div>Tap to record or choose a file</div>
+          <div class="hint" id="durationHint"></div>
+          <div class="filename" id="fileNameDisplay"></div>
+          <button type="button" id="resetMediaBtn" style="display:none;" onclick="event.stopPropagation(); resetMedia();">Remove &amp; choose again</button>
+        </div>
+        <input type="file" id="mediaInput" accept="video/*,image/*" capture="environment" required>
+      </div>
+
+      <div class="field">
+        <label>Location</label>
+        <div class="loc-status" id="locStatus">
+          <div class="loc-dot" id="locDot"></div>
+          <span id="locText">Detecting your location…</span>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="category">What kind of issue is this?</label>
+        <select id="category" required>
+          <option value="">Select a category</option>
+          <option value="garbage">Garbage / sanitation</option>
+          <option value="pothole">Pothole / road damage</option>
+          <option value="streetlight">Streetlight not working</option>
+          <option value="water_supply">Water supply issue</option>
+          <option value="sewage">Sewage / drainage</option>
+          <option value="power_outage">Power outage</option>
+          <option value="power_fault">Electrical fault</option>
+          <option value="stray_animals">Stray animals</option>
+          <option value="parks_encroachment">Park encroachment</option>
+          <option value="other">Other</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="description">Describe what's happening (optional — you can also just speak in the video)</label>
+        <textarea id="description" placeholder="e.g. This pothole has been here for two weeks and is getting worse after the rain."></textarea>
+      </div>
+
+      <button type="submit" id="submitBtn" disabled>Add a video or photo</button>
+      <div class="disclaimer">
+        Your report will be automatically matched with others reporting the same issue nearby, drafted into a formal complaint, and sent to the responsible authority. You'll be asked to confirm before anything is sent to authorities that require your account details (e.g. water or electricity board).
+      </div>
+    </form>
+  </div>
+
+  <div class="card success" id="successCard">
+    <div class="stamp" id="reporterStamp">1</div>
+    <h2 id="successHeading">Report received</h2>
+    <p id="successSub">Matched with existing reports in your area — no duplicate complaint needed.</p>
+    <div class="receipt" id="receiptBox"></div>
+  </div>
+</div>
+
+<script>
+let coords = null;
+let locationResolved = false;
+let mediaValid = false;
+let trimmedBlob = null; // set when a video gets trimmed; handleSubmit uses this over the raw file if present
+const TRIM_SECONDS = 120; // videos longer than this get cut down to their first 120s, not rejected
+const TRIM_LABEL = TRIM_SECONDS % 60 === 0 ? `${TRIM_SECONDS / 60} minutes` : `${TRIM_SECONDS}s`;
+document.getElementById('durationHint').textContent = `Videos longer than ${TRIM_LABEL} are automatically trimmed to the first ${TRIM_LABEL}.`;
+
+function setLocStatus(state, text){
+  const dot = document.getElementById('locDot');
+  dot.className = 'loc-dot' + (state === 'found' ? ' found' : state === 'error' ? ' error' : '');
+  document.getElementById('locText').textContent = text;
+  updateSubmitState();
+}
+
+function updateSubmitState(){
+  const btn = document.getElementById('submitBtn');
+  if(!mediaValid){
+    btn.disabled = true;
+    btn.textContent = 'Add a video or photo';
+  } else if(!locationResolved){
+    btn.disabled = true;
+    btn.textContent = 'Detecting location…';
+  } else {
+    btn.disabled = false;
+    btn.textContent = 'Submit report';
+  }
+}
+
+updateSubmitState();
+
+if(navigator.geolocation){
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      locationResolved = true;
+      setLocStatus('found', `Location found (±${Math.round(pos.coords.accuracy)}m accuracy)`);
+    },
+    err => {
+      locationResolved = true;
+      setLocStatus('error', 'Could not detect location — you can still submit, but routing may be delayed');
+    },
+    { enableHighAccuracy: true, timeout: 10000 }
+  );
+} else {
+  locationResolved = true;
+  setLocStatus('error', 'Location not supported on this device');
+}
+
+// Re-records the video's own playback for the first TRIM_SECONDS using
+// captureStream + MediaRecorder. This re-encodes (it's not a fast byte-level
+// cut), but it needs no external library and works without a server round
+// trip. Requires MediaRecorder + captureStream support (modern Chrome/
+// Firefox/Edge; Safari support varies) — see the fallback below for browsers
+// that lack it.
+function trimVideo(sourceEl, onDone, onUnsupported){
+  if(typeof sourceEl.captureStream !== 'function' || typeof MediaRecorder === 'undefined'){
+    onUnsupported();
+    return;
+  }
+  let stream;
+  try {
+    stream = sourceEl.captureStream();
+  } catch (err) {
+    onUnsupported();
+    return;
+  }
+
+  const mimeCandidates = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'];
+  const supportedMime = mimeCandidates.find(m => MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(m));
+  if(!supportedMime){
+    onUnsupported();
+    return;
+  }
+
+  const recorder = new MediaRecorder(stream, { mimeType: supportedMime });
+  const chunks = [];
+  let stopped = false;
+
+  recorder.ondataavailable = e => { if(e.data.size > 0) chunks.push(e.data); };
+  recorder.onstop = () => onDone(new Blob(chunks, { type: supportedMime }));
+
+  const stopOnce = () => {
+    if(stopped) return;
+    stopped = true;
+    if(recorder.state !== 'inactive') recorder.stop();
+    sourceEl.pause();
+  };
+
+  sourceEl.volume = 0; // don't play audibly — volume doesn't affect captureStream's audio track, muted would
+  sourceEl.currentTime = 0;
+  sourceEl.onended = stopOnce;
+  recorder.start();
+  sourceEl.play().catch(() => onUnsupported());
+  setTimeout(stopOnce, TRIM_SECONDS * 1000);
+}
+
+function setMediaDisplay(text, color, showReset){
+  const nameDisplay = document.getElementById('fileNameDisplay');
+  const resetBtn = document.getElementById('resetMediaBtn');
+  const zone = document.getElementById('uploadZone');
+  nameDisplay.style.color = color || '';
+  nameDisplay.textContent = text || '';
+  resetBtn.style.display = showReset ? 'block' : 'none';
+  zone.classList.toggle('has-file', !!text && color !== 'var(--amber)');
+}
+
+function resetMedia(){
+  document.getElementById('mediaInput').value = '';
+  trimmedBlob = null;
+  mediaValid = false;
+  setMediaDisplay('', '', false);
+  updateSubmitState();
+}
+
+document.getElementById('mediaInput').addEventListener('change', function(e){
+  const file = e.target.files[0];
+  trimmedBlob = null;
+
+  if(!file){
+    setMediaDisplay('', '', false);
+    mediaValid = false;
+    updateSubmitState();
+    return;
+  }
+
+  if(!file.type.startsWith('video/')){
+    setMediaDisplay(file.name, 'var(--teal)', true);
+    mediaValid = true;
+    updateSubmitState();
+    return;
+  }
+
+  const probe = document.createElement('video');
+  probe.preload = 'auto';
+  probe.muted = false; // must stay unmuted for captureStream to carry audio — volume=0 keeps it silent to the ear
+  probe.playsInline = true;
+  probe.style.display = 'none';
+  document.body.appendChild(probe);
+
+  probe.onloadedmetadata = function(){
+    if(probe.duration <= TRIM_SECONDS){
+      URL.revokeObjectURL(probe.src);
+      probe.remove();
+      setMediaDisplay(`${file.name} (${Math.round(probe.duration)}s)`, 'var(--teal)', true);
+      mediaValid = true;
+      updateSubmitState();
+      return;
+    }
+
+    // Over the limit — trim rather than reject.
+    mediaValid = false;
+    setMediaDisplay(`Trimming to first ${TRIM_LABEL}…`, 'var(--amber)', false);
+    updateSubmitState();
+
+    trimVideo(
+      probe,
+      blob => {
+        URL.revokeObjectURL(probe.src);
+        probe.remove();
+        trimmedBlob = blob;
+        setMediaDisplay(`${file.name} — trimmed to ${TRIM_LABEL} (${Math.round(blob.size / 1024 / 1024 * 10) / 10}MB)`, 'var(--teal)', true);
+        mediaValid = true;
+        updateSubmitState();
+      },
+      () => {
+        URL.revokeObjectURL(probe.src);
+        probe.remove();
+        setMediaDisplay(`${file.name} (${Math.round(probe.duration)}s — will be trimmed on our end, this browser can't trim locally)`, 'var(--amber)', true);
+        mediaValid = true;
+        updateSubmitState();
+      }
+    );
+  };
+  probe.src = URL.createObjectURL(file);
+});
+
+document.getElementById('reportForm').addEventListener('submit', function(e){
+  e.preventDefault();
+  handleSubmit();
+});
+
+// This is the function to wire up to your real backend. It currently builds
+// the RawReport-shaped payload client-side and shows it back to you, but
+// doesn't upload or call an API.
+async function handleSubmit(){
+  const category = document.getElementById('category').value;
+  const description = document.getElementById('description').value;
+  const rawFile = document.getElementById('mediaInput').files[0];
+  const uploadable = trimmedBlob || rawFile;
+  const submitBtn = document.getElementById('submitBtn');
+
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Submitting…';
+
+  const reportId = 'rep_' + Math.random().toString(36).slice(2, 10);
+
+  try {
+    // Step 1: get an upload URL (real implementation uploads `uploadable`
+    // to it via PUT before calling /reports — omitted here since there's
+    // no real bucket configured yet in this deployment).
+    await fetch('/reports/init-upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fileName: rawFile ? rawFile.name : 'photo.jpg', contentType: uploadable ? uploadable.type : 'image/jpeg' }),
+    });
+
+    // Step 2: submit the report metadata — this is what actually runs
+    // through ward lookup, consolidation, and drafting on the server.
+    const res = await fetch('/reports', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        reportId,
+        location: coords,
+        category,
+        transcript: description,
+        confidence: 0.9, // no real classification model wired in yet — see processing worker step
+        videoUrl: null,
+        photoUrls: [],
+      }),
+    });
+
+    if (!res.ok) throw new Error(`Server responded ${res.status}`);
+    const result = await res.json();
+
+    document.getElementById('formWrap').classList.add('hidden');
+    document.getElementById('successCard').classList.add('show');
+
+    const isDuplicate = result.status === 'merged';
+    document.getElementById('reporterStamp').textContent = isDuplicate ? String(result.reporterCount) : '1';
+    document.getElementById('successHeading').textContent = isDuplicate ? 'Added to an existing report' : 'New report filed';
+    document.getElementById('successSub').textContent = isDuplicate
+      ? `${result.reporterCount - 1} other resident(s) already reported this — your video was attached as supporting evidence.`
+      : `Routed to ${result.authority || 'the responsible authority'} via ${result.channel || 'the appropriate channel'}.`;
+
+    document.getElementById('receiptBox').innerHTML = `
+      <div><span class="k">Report ID:</span> ${reportId}</div>
+      <div><span class="k">Category:</span> ${category || '—'}</div>
+      <div><span class="k">Location:</span> ${coords ? coords.lat.toFixed(5) + ', ' + coords.lng.toFixed(5) : 'not detected'}</div>
+      <div><span class="k">Submitted:</span> ${new Date().toLocaleString('en-IN')}</div>
+    `;
+  } catch (err) {
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Submit report';
+    setMediaDisplay(`Could not submit — ${err.message}. Please try again.`, 'var(--rust)', mediaValid);
+  }
+}
+</script>
+</body>
+</html>

@@ -167,15 +167,24 @@ function updateSubmitState(){
   } else if(!locationResolved){
     btn.disabled = true;
     btn.textContent = 'Detecting location…';
+  } else if(!coords){
+    btn.disabled = true;
+    btn.textContent = 'Location needed — tap Retry above';
   } else {
     btn.disabled = false;
     btn.textContent = 'Submit report';
   }
 }
 
-updateSubmitState();
+function attemptLocation(){
+  if(!navigator.geolocation){
+    locationResolved = true;
+    coords = null;
+    setLocStatus('error', 'Location not supported on this browser — a GPS-enabled device is needed to submit');
+    return;
+  }
 
-if(navigator.geolocation){
+  setLocStatus('', 'Detecting your location…');
   navigator.geolocation.getCurrentPosition(
     pos => {
       coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
@@ -184,14 +193,21 @@ if(navigator.geolocation){
     },
     err => {
       locationResolved = true;
-      setLocStatus('error', 'Could not detect location — you can still submit, but routing may be delayed');
+      coords = null;
+      const locStatusEl = document.getElementById('locStatus');
+      locStatusEl.innerHTML = `
+        <div class="loc-dot error"></div>
+        <span>Could not detect location — a location is required to route your report.</span>
+        <button type="button" onclick="attemptLocation()" style="margin-left:8px;background:none;border:1px solid var(--rust);color:var(--rust);border-radius:4px;padding:2px 8px;font-size:12px;cursor:pointer;">Retry</button>
+      `;
+      updateSubmitState();
     },
     { enableHighAccuracy: true, timeout: 10000 }
   );
-} else {
-  locationResolved = true;
-  setLocStatus('error', 'Location not supported on this device');
 }
+
+updateSubmitState();
+attemptLocation();
 
 // Re-records the video's own playback for the first TRIM_SECONDS using
 // captureStream + MediaRecorder. This re-encodes (it's not a fast byte-level

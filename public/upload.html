@@ -389,12 +389,29 @@ async function handleSubmit(){
     document.getElementById('formWrap').classList.add('hidden');
     document.getElementById('successCard').classList.add('show');
 
-    const isDuplicate = result.status === 'merged';
-    document.getElementById('reporterStamp').textContent = isDuplicate ? String(result.reporterCount) : '1';
-    document.getElementById('successHeading').textContent = isDuplicate ? 'Added to an existing report' : 'New report filed';
-    document.getElementById('successSub').textContent = isDuplicate
-      ? `${result.reporterCount - 1} other resident(s) already reported this — your video was attached as supporting evidence.`
-      : `Routed to ${result.authority || 'the responsible authority'} via ${result.channel || 'the appropriate channel'}.`;
+    const stampEl = document.getElementById('reporterStamp');
+    const headingEl = document.getElementById('successHeading');
+    const subEl = document.getElementById('successSub');
+
+    if (result.status === 'merged') {
+      stampEl.textContent = String(result.reporterCount);
+      headingEl.textContent = 'Added to an existing report';
+      subEl.textContent = `${result.reporterCount - 1} other resident(s) already reported this — your video was attached as supporting evidence.`;
+    } else if (result.status === 'new_thread') {
+      stampEl.textContent = '1';
+      headingEl.textContent = 'New report filed';
+      subEl.textContent = `Routed to ${result.authority || 'the responsible authority'} via ${result.channel || 'the appropriate channel'}.`;
+    } else if (result.status === 'needs_manual_review') {
+      stampEl.textContent = '—';
+      headingEl.textContent = 'Received — needs manual review';
+      subEl.textContent = result.reason === 'location outside known ward boundaries'
+        ? 'Your location falls outside our current coverage area (Delhi NCR), so this couldn\'t be automatically routed. It has been logged for manual follow-up.'
+        : `This report needs manual review before routing (${result.reason || 'reason not specified'}).`;
+    } else {
+      stampEl.textContent = '?';
+      headingEl.textContent = 'Received';
+      subEl.textContent = `Unrecognized status from server: ${result.status || 'none'}. Check with the team.`;
+    }
 
     document.getElementById('receiptBox').innerHTML = `
       <div><span class="k">Report ID:</span> ${reportId}</div>

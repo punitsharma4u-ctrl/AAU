@@ -2,13 +2,18 @@ import { Pool } from "pg";
 
 const CLUSTER_RADIUS_METERS = 100;
 
-export const pool = new Pool({
-  host: process.env.PGHOST ?? "localhost",
-  port: Number(process.env.PGPORT ?? 5432),
-  user: process.env.PGUSER ?? "app",
-  password: process.env.PGPASSWORD ?? "app",
-  database: process.env.PGDATABASE ?? "complaint_router",
-});
+export const pool = process.env.DATABASE_URL
+  ? new Pool({
+      connectionString: process.env.DATABASE_URL,
+      ssl: { rejectUnauthorized: false }, // Render's external connections require SSL
+    })
+  : new Pool({
+      host: process.env.PGHOST ?? "localhost",
+      port: Number(process.env.PGPORT ?? 5432),
+      user: process.env.PGUSER ?? "app",
+      password: process.env.PGPASSWORD ?? "app",
+      database: process.env.PGDATABASE ?? "complaint_router",
+    });
 
 export interface DbThread {
   id: string;

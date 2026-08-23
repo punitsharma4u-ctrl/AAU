@@ -162,6 +162,17 @@ app.get("/threads", async (_req, res) => {
   res.json(rows);
 });
 
+// Catches anything unhandled by a route -- including errors thrown inside
+// middleware like multer (e.g. file-size limits, malformed multipart data)
+// before it ever reaches a route's own try/catch. Without this, Express's
+// default handler returns a bare HTML 500 with no detail, which is exactly
+// what happened when a real multer-layer failure showed up as an opaque
+// "(500)" on the client with nothing to debug from.
+app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  console.error("Unhandled error:", err);
+  res.status(500).json({ error: err.message || "Unknown server error" });
+});
+
 const PORT = process.env.PORT ?? 3001;
 app.listen(PORT, () => console.log(`Ingestion API listening on :${PORT}`));
 

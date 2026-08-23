@@ -1,10 +1,13 @@
 import { pool } from "../db/spatialDedup";
 import { decideEscalation } from "../src/escalation";
 
-// Runs once a day (see cron registration below). This is the DB-backed
-// version of markStaleThreads() + runEscalationSweep() from escalation.ts --
-// those functions operate on in-memory IssueThread[]; this reads/writes the
-// real table so the effect actually persists between runs.
+// Runs once and exits -- this is the entrypoint for Render's "Cron Job"
+// resource type (or any external scheduler), which triggers a command at
+// scheduled times and expects it to complete, not stay running. Do NOT
+// point an external scheduler at cron.ts instead -- that file uses an
+// internal self-scheduler (node-cron) meant for a different deployment
+// style (an always-on process that schedules itself), and running both
+// together would double-schedule and hang.
 
 const STALE_AFTER_DAYS = 45;
 

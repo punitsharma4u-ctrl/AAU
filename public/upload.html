@@ -355,20 +355,39 @@ async function handleSubmit(){
   submitBtn.disabled = true;
   submitBtn.textContent = 'Submitting…';
 
-  const reportId = 'rep_' + Math.random().toString(36).slice(2, 10);
-
   try {
-    // Step 1: get an upload URL (real implementation uploads `uploadable`
-    // to it via PUT before calling /reports — omitted here since there's
-    // no real bucket configured yet in this deployment).
-    await fetch('/reports/init-upload', {
+    const fileName = rawFile ? rawFile.name : 'photo.jpg';
+    const contentType = uploadable ? uploadable.type : 'image/jpeg';
+
+    // Step 1: get a real presigned S3 URL. The server assigns the
+    // authoritative reportId here — everything downstream (the S3 key, the
+    // database record) uses this same ID, not a separately-generated one.
+    const initRes = await fetch('/reports/init-upload', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ fileName: rawFile ? rawFile.name : 'photo.jpg', contentType: uploadable ? uploadable.type : 'image/jpeg' }),
+      body: JSON.stringify({ fileName, contentType }),
     });
+    if (!initRes.ok) throw new Error(`Could not get upload URL (${initRes.status})`);
+    const { reportId, uploadUrl, publicUrl } = await initRes.json();
 
-    // Step 2: submit the report metadata — this is what actually runs
-    // through ward lookup, consolidation, and drafting on the server.
+    // Step 2: actually upload the file to S3 directly (not through our
+    // server — that's the point of a presigned URL, the bytes go straight
+    // to the bucket).
+    let mediaUrl = null;
+    if (uploadable) {
+      const putRes = await fetch(uploadUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': contentType },
+        body: uploadable,
+      });
+      if (!putRes.ok) throw new Error(`File upload to storage failed (${putRes.status})`);
+      mediaUrl = publicUrl;
+    }
+
+    // Step 3: submit the report metadata, referencing the file we just
+    // actually stored — this is what runs ward lookup, consolidation, and
+    // drafting on the server.
+    const isVideo = uploadable && uploadable.type && uploadable.type.startsWith('video/');
     const res = await fetch('/reports', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -377,9 +396,9 @@ async function handleSubmit(){
         location: coords,
         category,
         transcript: description,
-        confidence: 0.9, // no real classification model wired in yet — see processing worker step
-        videoUrl: null,
-        photoUrls: [],
+        confidence: 0.9, // no real classification model wired in yet — category comes from the citizen's own selection
+        videoUrl: isVideo ? mediaUrl : null,
+        photoUrls: (!isVideo && mediaUrl) ? [mediaUrl] : [],
       }),
     });
 

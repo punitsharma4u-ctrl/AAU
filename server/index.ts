@@ -1,5 +1,7 @@
 import express from "express";
 import path from "path";
+import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { pool } from "../db/spatialDedup";
 import { resolveWard } from "../db/wardLookup";
 import { findMatchingThreadInDb, mergeIntoThread, createThread } from "../db/spatialDedup";
@@ -9,35 +11,38 @@ import { IssueThread, RawReport } from "../src/types";
 
 const app = express();
 app.use(express.json());
-// Serves upload.html and dashboard.html directly -- one deployed service
-// instead of separately hosting the API and the static pages.
 app.use(express.static(path.join(__dirname, "../../public")));
 
 const MIN_CONFIDENCE_FOR_AUTO_ROUTE = 0.6;
 
+const s3Client = new S3Client({ region: process.env.AWS_REGION ?? "ap-south-1" });
+
 // POST /reports/init-upload
-// Returns a presigned S3 PUT URL. The actual AWS call is commented out
-// (no real bucket/credentials in this environment) but the presign
-// generation itself is pure crypto -- no network call -- so this shows the
-// real shape of the endpoint.
+// Returns a real presigned S3 PUT URL. Presign generation is pure crypto --
+// no network call to AWS happens here, it's just signing a request the
+// client will make directly to S3 afterward.
 app.post("/reports/init-upload", async (req, res) => {
   const { fileName, contentType } = req.body;
   if (!fileName || !contentType) {
     return res.status(400).json({ error: "fileName and contentType required" });
   }
 
+  const bucket = process.env.UPLOAD_BUCKET;
+  if (!bucket) {
+    return res.status(500).json({ error: "UPLOAD_BUCKET not configured on the server" });
+  }
+
   const reportId = "rep_" + Math.random().toString(36).slice(2, 10);
   const key = `raw-uploads/${reportId}/${fileName}`;
 
-  // Real implementation:
-  //   const { S3Client, PutObjectCommand } = require("@aws-sdk/client-s3");
-  //   const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
-  //   const client = new S3Client({ region: process.env.AWS_REGION });
-  //   const command = new PutObjectCommand({ Bucket: process.env.UPLOAD_BUCKET, Key: key, ContentType: contentType });
-  //   const uploadUrl = await getSignedUrl(client, command, { expiresIn: 300 });
-  const uploadUrl = `https://YOUR_BUCKET.s3.amazonaws.com/${key}?X-Amz-Signature=DEMO`;
-
-  res.json({ reportId, uploadUrl, key });
+  try {
+    const command = new PutObjectCommand({ Bucket: bucket, Key: key, ContentType: contentType });
+    const uploadUrl = await getSignedUrl(s3Client, command, { expiresIn: 300 });
+    const publicUrl = `https://${bucket}.s3.${process.env.AWS_REGION ?? "ap-south-1"}.amazonaws.com/${key}`;
+    res.json({ reportId, uploadUrl, key, publicUrl });
+  } catch (err) {
+    res.status(500).json({ error: `Failed to generate upload URL: ${(err as Error).message}` });
+  }
 });
 
 // POST /reports

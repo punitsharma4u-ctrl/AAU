@@ -356,44 +356,29 @@ async function handleSubmit(){
   submitBtn.textContent = 'Submitting…';
 
   try {
-    const fileName = rawFile ? rawFile.name : 'photo.jpg';
-    const contentType = uploadable ? uploadable.type : 'image/jpeg';
-
-    // Step 1: get a real presigned S3 URL. The server assigns the
-    // authoritative reportId here — everything downstream (the S3 key, the
-    // database record) uses this same ID, not a separately-generated one.
-    const initRes = await fetch('/reports/init-upload', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ fileName, contentType }),
-    });
-    if (!initRes.ok) {
-      const errBody = await initRes.json().catch(() => ({}));
-      throw new Error(errBody.error || `Could not get upload URL (${initRes.status})`);
-    }
-    const { reportId, uploadUrl, publicUrl } = await initRes.json();
-
-    // Step 2: actually upload the file to S3 directly (not through our
-    // server — that's the point of a presigned URL, the bytes go straight
-    // to the bucket).
-    let mediaUrl = null;
-    if (uploadable) {
-      const putRes = await fetch(uploadUrl, {
-        method: 'PUT',
-        headers: { 'Content-Type': contentType },
-        body: uploadable,
-      });
-      if (!putRes.ok) {
-        const errText = await putRes.text().catch(() => '');
-        throw new Error(`File upload to storage failed (${putRes.status}): ${errText.slice(0, 200)}`);
-      }
-      mediaUrl = publicUrl;
-    }
-
-    // Step 3: submit the report metadata, referencing the file we just
-    // actually stored — this is what runs ward lookup, consolidation, and
-    // drafting on the server.
+    let reportId, mediaUrl = null;
     const isVideo = uploadable && uploadable.type && uploadable.type.startsWith('video/');
+
+    if (uploadable) {
+      // Single request: file goes straight to our own server, which
+      // uploads it to S3 itself. No direct browser-to-S3 connection.
+      const formData = new FormData();
+      formData.append('file', uploadable, rawFile ? rawFile.name : 'photo.jpg');
+
+      const uploadRes = await fetch('/reports/upload-media', { method: 'POST', body: formData });
+      if (!uploadRes.ok) {
+        const errBody = await uploadRes.json().catch(() => ({}));
+        throw new Error(errBody.error || `Upload failed (${uploadRes.status})`);
+      }
+      const uploadResult = await uploadRes.json();
+      reportId = uploadResult.reportId;
+      mediaUrl = uploadResult.publicUrl;
+    } else {
+      reportId = 'rep_' + Math.random().toString(36).slice(2, 10);
+    }
+
+    // Submit the report metadata, referencing the file we just stored —
+    // this is what runs ward lookup, consolidation, and drafting.
     const res = await fetch('/reports', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

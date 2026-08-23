@@ -1,7 +1,7 @@
 import express from "express";
 import path from "path";
+import multer from "multer";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { pool } from "../db/spatialDedup";
 import { resolveWard } from "../db/wardLookup";
 import { findMatchingThreadInDb, mergeIntoThread, createThread } from "../db/spatialDedup";
@@ -15,25 +15,24 @@ app.use(express.static(path.join(__dirname, "../../public")));
 
 const MIN_CONFIDENCE_FOR_AUTO_ROUTE = 0.6;
 
-// requestChecksumCalculation: "WHEN_REQUIRED" turns off the SDK's newer
-// default behavior of always attaching a checksum requirement (e.g.
-// x-amz-checksum-crc32) to presigned URLs. A browser doing a plain
-// fetch() PUT doesn't compute or send that checksum, so S3 resets the
-// connection instead of accepting the upload -- confirmed live: this
-// caused net::ERR_CONNECTION_RESET on every real upload attempt.
 const s3Client = new S3Client({
   region: process.env.AWS_REGION ?? "ap-south-1",
   requestChecksumCalculation: "WHEN_REQUIRED",
 });
 
-// POST /reports/init-upload
-// Returns a real presigned S3 PUT URL. Presign generation is pure crypto --
-// no network call to AWS happens here, it's just signing a request the
-// client will make directly to S3 afterward.
-app.post("/reports/init-upload", async (req, res) => {
-  const { fileName, contentType } = req.body;
-  if (!fileName || !contentType) {
-    return res.status(400).json({ error: "fileName and contentType required" });
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 100 * 1024 * 1024 } });
+
+// POST /reports/upload-media
+// Server-proxied upload: the browser sends the file here (same-origin,
+// multipart/form-data), and the server uploads it to S3 itself using the
+// AWS SDK directly -- no presigned URL, no browser-to-S3 connection at all.
+// Switched to this after a direct presigned-URL PUT from the browser
+// consistently failed with net::ERR_CONNECTION_RESET in live testing, even
+// after fixing the known SDK checksum issue -- this sidesteps that whole
+// class of browser/network-specific failure.
+app.post("/reports/upload-media", upload.single("file"), async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: "No file provided" });
   }
 
   const bucket = process.env.UPLOAD_BUCKET;
@@ -42,15 +41,21 @@ app.post("/reports/init-upload", async (req, res) => {
   }
 
   const reportId = "rep_" + Math.random().toString(36).slice(2, 10);
-  const key = `raw-uploads/${reportId}/${fileName}`;
+  const key = `raw-uploads/${reportId}/${req.file.originalname}`;
 
   try {
-    const command = new PutObjectCommand({ Bucket: bucket, Key: key, ContentType: contentType });
-    const uploadUrl = await getSignedUrl(s3Client, command, { expiresIn: 300 });
+    await s3Client.send(
+      new PutObjectCommand({
+        Bucket: bucket,
+        Key: key,
+        Body: req.file.buffer,
+        ContentType: req.file.mimetype,
+      }),
+    );
     const publicUrl = `https://${bucket}.s3.${process.env.AWS_REGION ?? "ap-south-1"}.amazonaws.com/${key}`;
-    res.json({ reportId, uploadUrl, key, publicUrl });
+    res.json({ reportId, publicUrl });
   } catch (err) {
-    res.status(500).json({ error: `Failed to generate upload URL: ${(err as Error).message}` });
+    res.status(500).json({ error: `Upload to storage failed: ${(err as Error).message}` });
   }
 });
 

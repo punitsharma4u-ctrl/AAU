@@ -15,7 +15,16 @@ app.use(express.static(path.join(__dirname, "../../public")));
 
 const MIN_CONFIDENCE_FOR_AUTO_ROUTE = 0.6;
 
-const s3Client = new S3Client({ region: process.env.AWS_REGION ?? "ap-south-1" });
+// requestChecksumCalculation: "WHEN_REQUIRED" turns off the SDK's newer
+// default behavior of always attaching a checksum requirement (e.g.
+// x-amz-checksum-crc32) to presigned URLs. A browser doing a plain
+// fetch() PUT doesn't compute or send that checksum, so S3 resets the
+// connection instead of accepting the upload -- confirmed live: this
+// caused net::ERR_CONNECTION_RESET on every real upload attempt.
+const s3Client = new S3Client({
+  region: process.env.AWS_REGION ?? "ap-south-1",
+  requestChecksumCalculation: "WHEN_REQUIRED",
+});
 
 // POST /reports/init-upload
 // Returns a real presigned S3 PUT URL. Presign generation is pure crypto --

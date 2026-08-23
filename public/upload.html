@@ -367,7 +367,10 @@ async function handleSubmit(){
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ fileName, contentType }),
     });
-    if (!initRes.ok) throw new Error(`Could not get upload URL (${initRes.status})`);
+    if (!initRes.ok) {
+      const errBody = await initRes.json().catch(() => ({}));
+      throw new Error(errBody.error || `Could not get upload URL (${initRes.status})`);
+    }
     const { reportId, uploadUrl, publicUrl } = await initRes.json();
 
     // Step 2: actually upload the file to S3 directly (not through our
@@ -380,7 +383,10 @@ async function handleSubmit(){
         headers: { 'Content-Type': contentType },
         body: uploadable,
       });
-      if (!putRes.ok) throw new Error(`File upload to storage failed (${putRes.status})`);
+      if (!putRes.ok) {
+        const errText = await putRes.text().catch(() => '');
+        throw new Error(`File upload to storage failed (${putRes.status}): ${errText.slice(0, 200)}`);
+      }
       mediaUrl = publicUrl;
     }
 
@@ -402,7 +408,10 @@ async function handleSubmit(){
       }),
     });
 
-    if (!res.ok) throw new Error(`Server responded ${res.status}`);
+    if (!res.ok) {
+      const errBody = await res.json().catch(() => ({}));
+      throw new Error(errBody.error || `Server responded ${res.status}`);
+    }
     const result = await res.json();
 
     document.getElementById('formWrap').classList.add('hidden');

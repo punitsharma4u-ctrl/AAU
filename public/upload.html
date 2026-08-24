@@ -235,7 +235,11 @@ function trimVideo(sourceEl, onDone, onUnsupported){
     return;
   }
 
-  const recorder = new MediaRecorder(stream, { mimeType: supportedMime });
+  // 2.5 Mbps caps a 2-minute clip around ~35-40MB even at higher source
+  // resolutions -- without this, MediaRecorder defaults can track the
+  // source's own (much higher) bitrate, especially for 4K phone footage,
+  // defeating the point of re-encoding a too-large file.
+  const recorder = new MediaRecorder(stream, { mimeType: supportedMime, videoBitsPerSecond: 2_500_000 });
   const chunks = [];
   let stopped = false;
 
@@ -300,19 +304,31 @@ document.getElementById('mediaInput').addEventListener('change', function(e){
   probe.style.display = 'none';
   document.body.appendChild(probe);
 
+const MAX_FILE_SIZE_MB = 90; // stay safely under the server's 100MB multer limit
+
   probe.onloadedmetadata = function(){
-    if(probe.duration <= TRIM_SECONDS){
+    const fileSizeMB = file.size / 1024 / 1024;
+    const overDuration = probe.duration > TRIM_SECONDS;
+    const overSize = fileSizeMB > MAX_FILE_SIZE_MB;
+
+    if(!overDuration && !overSize){
       URL.revokeObjectURL(probe.src);
       probe.remove();
-      setMediaDisplay(`${file.name} (${Math.round(probe.duration)}s)`, 'var(--teal)', true);
+      setMediaDisplay(`${file.name} (${Math.round(probe.duration)}s, ${fileSizeMB.toFixed(1)}MB)`, 'var(--teal)', true);
       mediaValid = true;
       updateSubmitState();
       return;
     }
 
-    // Over the limit — trim rather than reject.
+    // Over the duration limit, the size limit, or both — re-encode rather
+    // than reject. A short but huge file (e.g. 4K footage under 2 minutes)
+    // still needs this even though it wouldn't trip the duration check
+    // alone — trimVideo's re-encode also naturally brings file size down,
+    // since browsers record at a far more modest bitrate than raw camera
+    // output.
     mediaValid = false;
-    setMediaDisplay(`Trimming to first ${TRIM_LABEL}…`, 'var(--amber)', false);
+    const reason = overDuration ? `Trimming to first ${TRIM_LABEL}` : 'Compressing (file is too large)';
+    setMediaDisplay(`${reason}…`, 'var(--amber)', false);
     updateSubmitState();
 
     trimVideo(

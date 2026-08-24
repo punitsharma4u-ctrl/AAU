@@ -21,7 +21,7 @@ export async function generateDescriptionFromFrame(
   const base64Image = frameJpeg.toString("base64");
 
   const message = await client.messages.create({
-    model: "claude-sonnet-4-5",
+    model: "claude-sonnet-5",
     max_tokens: 150,
     messages: [
       {

@@ -327,8 +327,7 @@ const MAX_FILE_SIZE_MB = 90; // stay safely under the server's 100MB multer limi
     // since browsers record at a far more modest bitrate than raw camera
     // output.
     mediaValid = false;
-    const reason = overDuration ? `Trimming to first ${TRIM_LABEL}` : 'Compressing (file is too large)';
-    setMediaDisplay(`${reason}…`, 'var(--amber)', false);
+    setMediaDisplay(`Trimming to first ${TRIM_LABEL}…`, 'var(--amber)', false);
     updateSubmitState();
 
     trimVideo(

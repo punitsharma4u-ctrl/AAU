@@ -55,6 +55,11 @@ app.post("/reports/upload-media", upload.single("file"), async (req, res) => {
     const isVideo = req.file.mimetype.startsWith("video/");
     const frameForAnalysis = isVideo ? await extractFrame(req.file.buffer, req.file.originalname) : req.file.buffer;
     aiDescription = await generateDescriptionFromFrame(frameForAnalysis, category);
+    if (aiDescription) {
+      console.log(`AI description generated (${aiDescription.length} chars): "${aiDescription}"`);
+    } else {
+      console.warn("AI description call succeeded but returned empty text");
+    }
   } catch (err) {
     console.error("AI description generation failed (non-fatal):", (err as Error).message);
   }

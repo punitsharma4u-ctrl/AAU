@@ -356,14 +356,16 @@ async function handleSubmit(){
   submitBtn.textContent = 'Submitting…';
 
   try {
-    let reportId, mediaUrl = null;
+    let reportId, mediaUrl = null, aiDescription = null;
     const isVideo = uploadable && uploadable.type && uploadable.type.startsWith('video/');
 
     if (uploadable) {
       // Single request: file goes straight to our own server, which
       // uploads it to S3 itself. No direct browser-to-S3 connection.
+      // category is included so the AI description prompt has context.
       const formData = new FormData();
       formData.append('file', uploadable, rawFile ? rawFile.name : 'photo.jpg');
+      formData.append('category', category);
 
       const uploadRes = await fetch('/reports/upload-media', { method: 'POST', body: formData });
       if (!uploadRes.ok) {
@@ -373,8 +375,19 @@ async function handleSubmit(){
       const uploadResult = await uploadRes.json();
       reportId = uploadResult.reportId;
       mediaUrl = uploadResult.publicUrl;
+      aiDescription = uploadResult.aiDescription;
     } else {
       reportId = 'rep_' + Math.random().toString(36).slice(2, 10);
+    }
+
+    // AI-generated description (from the actual video/photo) is the
+    // primary source, since most citizens won't type one. If they did type
+    // something, it's appended as their own note rather than discarded.
+    let finalTranscript = aiDescription || '';
+    if (description && description.trim()) {
+      finalTranscript = finalTranscript
+        ? `${finalTranscript} Reporter's own note: ${description.trim()}`
+        : description.trim();
     }
 
     // Submit the report metadata, referencing the file we just stored —
@@ -386,7 +399,7 @@ async function handleSubmit(){
         reportId,
         location: coords,
         category,
-        transcript: description,
+        transcript: finalTranscript,
         confidence: 0.9, // no real classification model wired in yet — category comes from the citizen's own selection
         videoUrl: isVideo ? mediaUrl : null,
         photoUrls: (!isVideo && mediaUrl) ? [mediaUrl] : [],

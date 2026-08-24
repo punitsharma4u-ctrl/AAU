@@ -8,6 +8,8 @@ import { findMatchingThreadInDb, mergeIntoThread, createThread } from "../db/spa
 import { resolveAuthority } from "../src/authorityMap";
 import { draftComplaint } from "../src/draftComplaint";
 import { IssueThread, RawReport } from "../src/types";
+import { extractFrame } from "./extractFrame";
+import { generateDescriptionFromFrame } from "./generateDescription";
 
 const app = express();
 app.use(express.json());
@@ -42,6 +44,20 @@ app.post("/reports/upload-media", upload.single("file"), async (req, res) => {
 
   const reportId = "rep_" + Math.random().toString(36).slice(2, 10);
   const key = `raw-uploads/${reportId}/${req.file.originalname}`;
+  const category = req.body.category || "civic issue";
+
+  // AI-generated description from the actual media, since most citizens
+  // won't type one -- this runs before the S3 upload so a slow/failed AI
+  // call doesn't hold up storing the file, and a failure here degrades
+  // gracefully (returns null) rather than blocking the whole submission.
+  let aiDescription: string | null = null;
+  try {
+    const isVideo = req.file.mimetype.startsWith("video/");
+    const frameForAnalysis = isVideo ? await extractFrame(req.file.buffer, req.file.originalname) : req.file.buffer;
+    aiDescription = await generateDescriptionFromFrame(frameForAnalysis, category);
+  } catch (err) {
+    console.error("AI description generation failed (non-fatal):", (err as Error).message);
+  }
 
   try {
     await s3Client.send(
@@ -53,7 +69,7 @@ app.post("/reports/upload-media", upload.single("file"), async (req, res) => {
       }),
     );
     const publicUrl = `https://${bucket}.s3.${process.env.AWS_REGION ?? "ap-south-1"}.amazonaws.com/${key}`;
-    res.json({ reportId, publicUrl });
+    res.json({ reportId, publicUrl, aiDescription });
   } catch (err) {
     res.status(500).json({ error: `Upload to storage failed: ${(err as Error).message}` });
   }
